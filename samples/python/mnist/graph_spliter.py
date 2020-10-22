@@ -29,7 +29,7 @@ def remove_nodes(onnx_model, nodes_to_remove):
     onnx_model.graph.ClearField('node')
     onnx_model.graph.node.extend(all_nodes)
 
-def split_graph(onnx_model):
+def split_graph(onnx_model, weight_names_to_train):
     forward_graph_outputs = set()
     backward_graph_inputs = set()
     backward_graph_outputs = set()
@@ -59,6 +59,9 @@ def split_graph(onnx_model):
     forward_model.graph.ClearField('initializer')
     for initializer_name in forward_graph_initializer_names:
         forward_model.graph.initializer.append(initializers[initializer_name])
+        # training weights need to be added to input
+        if initializer_name in weight_names_to_train:
+            add_input_from_initializer(forward_model, initializers[initializer_name]) 
 
     # outputs from forward graph that are also inputs of backwoard graph need to be added as graph output.
     for output in forward_graph_outputs:
@@ -83,11 +86,6 @@ def split_graph(onnx_model):
         if node.doc_string != 'Backward pass':
             nodes_to_remove_from_backward_graph.append(node)
 
-    # gradient of forward graph output will be the input of backward graph
-    for output in backward_model.graph.output:
-        if output.name + '_grad' in backward_graph_inputs:
-            add_input(backward_model, output.name + '_grad', output.type.tensor_type.elem_type)
-
     backward_graph_initializer_names = set()
     for input in backward_graph_inputs:
         if input in forward_graph_outputs:
@@ -98,6 +96,11 @@ def split_graph(onnx_model):
             add_input_from_initializer(backward_model, initializers[input])
         elif input in initializers:
             backward_graph_initializer_names.add(input)
+
+    # gradient of forward graph output will be the input of backward graph
+    for output in backward_model.graph.output:
+        if output.name + '_grad' in backward_graph_inputs:
+            add_input(backward_model, output.name + '_grad', output.type.tensor_type.elem_type)
 
     backward_model.graph.ClearField('initializer')
     for initializer_name in backward_graph_initializer_names:
@@ -120,7 +123,6 @@ def split_graph(onnx_model):
 
 
 # MNIST
-"""
 original_model = onnx.load('mnist_original.onnx')
 config = C.ModuleGradientGraphBuilderConfiguration()
 weight_names_to_train = set()
@@ -134,13 +136,13 @@ config.output_names = output_names
 
 gradient_graph_model = onnx.load_model_from_string(C.ModuleGradientGraphBuilder().build(original_model.SerializeToString(), config))
 onnx.save(gradient_graph_model, 'minst_gradient_graph.onnx')
-forward_model, backward_model = split_graph(gradient_graph_model)
+forward_model, backward_model = split_graph(gradient_graph_model, weight_names_to_train)
 onnx.save(forward_model, 'mnist_forward.onnx')
 onnx.save(backward_model, 'mnist_backward.onnx')
-"""
 
 
 #BERT
+"""
 original_model = onnx.load('bert-tiny.onnx')
 config = C.ModuleGradientGraphBuilderConfiguration()
 weight_names_to_train = set()
@@ -154,6 +156,7 @@ config.output_names = output_names
 
 gradient_graph_model = onnx.load_model_from_string(C.ModuleGradientGraphBuilder().build(original_model.SerializeToString(), config))
 onnx.save(gradient_graph_model, 'bert_gradient_graph.onnx')
-forward_model, backward_model = split_graph(gradient_graph_model)
+forward_model, backward_model = split_graph(gradient_graph_model, weight_names_to_train)
 onnx.save(forward_model, 'bert_forward.onnx')
 onnx.save(backward_model, 'bert_backward.onnx')
+"""
