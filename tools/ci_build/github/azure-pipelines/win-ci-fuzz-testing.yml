@@ -149,7 +149,7 @@ jobs:
   - task: CmdLine@2
     displayName: 'Run fuzz testing '
     inputs:
-      script: 'onnxruntime_security_fuzz.exe /f /t  /f "testdata\mnist.onnx"  1 m'
+      script: '$(Build.BinariesDirectory)\$(BuildConfig)\$(BuildConfig)\onnxruntime_security_fuzz.exe /f /t  /f "$(Build.BinariesDirectory)\$(BuildConfig)\$(BuildConfig)testdata\mnist.onnx"  1 m'
       workingDirectory: $(Build.BinariesDirectory)\$(BuildConfig)\$(BuildConfig)
       failOnStderr: false # Optional
   - task: mspremier.PostBuildCleanup.PostBuildCleanup-task.PostBuildCleanup@3
